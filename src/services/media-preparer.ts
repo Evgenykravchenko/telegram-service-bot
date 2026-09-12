@@ -28,6 +28,14 @@ export class MediaPreparer {
         file_size: file.size,
         error_message: null,
       });
+      try {
+        await this.telegram.deleteMessage(this.mediaChatId, uploaded.messageId);
+      } catch (error) {
+        this.logger.warn(
+          { err: error, mediaId: asset.id, messageId: uploaded.messageId },
+          'Telegram staging message deletion failed',
+        );
+      }
       this.logger.info({ mediaId: asset.id, kind: asset.kind }, 'Telegram media prepared');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

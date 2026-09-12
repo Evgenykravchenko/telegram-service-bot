@@ -16,7 +16,10 @@ describe('TelegramClient.uploadMedia', () => {
         return new Response(
           JSON.stringify({
             ok: true,
-            result: { video: { file_id: 'video-file-id', file_unique_id: 'unique-video-id' } },
+            result: {
+              message_id: 321,
+              video: { file_id: 'video-file-id', file_unique_id: 'unique-video-id' },
+            },
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
         );
@@ -43,7 +46,11 @@ describe('TelegramClient.uploadMedia', () => {
       })(),
     );
 
-    expect(result).toEqual({ fileId: 'video-file-id', fileUniqueId: 'unique-video-id' });
+    expect(result).toEqual({
+      fileId: 'video-file-id',
+      fileUniqueId: 'unique-video-id',
+      messageId: 321,
+    });
     expect(uploadedBody).toContain('name="video"; filename="video.mp4"');
     expect(uploadedBody).toContain('video-content');
   });

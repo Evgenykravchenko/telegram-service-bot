@@ -65,7 +65,7 @@ export class Application {
           config.TELEGRAM_UPLOAD_TIMEOUT_SECONDS * 1000,
         ),
         this.telegram,
-        config.TELEGRAM_MEDIA_CHAT_ID,
+        config.TELEGRAM_MEDIA_CHAT_ID || config.TELEGRAM_ADMIN_CHAT_ID,
         logger,
       );
       this.mediaWorker = new MediaWorker(
@@ -106,7 +106,11 @@ export class Application {
         `Bot must be an administrator of ${this.config.TELEGRAM_CHANNEL_USERNAME} to check subscriptions`,
       );
     }
-    if (this.mediaWorker) await this.telegram.getChat(this.config.TELEGRAM_MEDIA_CHAT_ID);
+    if (this.mediaWorker) {
+      await this.telegram.getChat(
+        this.config.TELEGRAM_MEDIA_CHAT_ID || this.config.TELEGRAM_ADMIN_CHAT_ID,
+      );
+    }
     await this.health.start();
     this.applicationWorker.start();
     this.mediaWorker?.start();

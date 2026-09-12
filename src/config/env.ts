@@ -59,14 +59,6 @@ const schema = z
       });
     }
 
-    if (value.YANDEX_DISK_TOKEN && !value.TELEGRAM_MEDIA_CHAT_ID) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['TELEGRAM_MEDIA_CHAT_ID'],
-        message: 'TELEGRAM_MEDIA_CHAT_ID is required when the media worker is enabled',
-      });
-    }
-
     if (value.NODE_ENV === 'production' && value.PRIVACY_POLICY_URL.includes('example.com')) {
       context.addIssue({
         code: z.ZodIssueCode.custom,

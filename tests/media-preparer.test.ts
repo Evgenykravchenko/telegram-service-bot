@@ -37,9 +37,12 @@ describe('MediaPreparer', () => {
       ),
     };
     const telegram = {
-      uploadMedia: vi
-        .fn()
-        .mockResolvedValue({ fileId: 'telegram-file', fileUniqueId: 'telegram-unique' }),
+      uploadMedia: vi.fn().mockResolvedValue({
+        fileId: 'telegram-file',
+        fileUniqueId: 'telegram-unique',
+        messageId: 42,
+      }),
+      deleteMessage: vi.fn().mockResolvedValue(true),
     };
     const preparer = new MediaPreparer(
       { updateMedia } as unknown as DirectusMediaClient,
@@ -65,6 +68,48 @@ describe('MediaPreparer', () => {
         mime_type: 'video/mp4',
         file_size: 1024,
       }),
+    );
+    expect(telegram.deleteMessage).toHaveBeenCalledWith('-100123', 42);
+  });
+
+  it('keeps prepared media ready when staging message deletion fails', async () => {
+    const updateMedia = vi.fn().mockResolvedValue(asset);
+    const file = {
+      href: 'https://download.example/file',
+      name: 'complex-1.mp4',
+      size: 1024,
+      mimeType: 'video/mp4',
+    };
+    const yandex = {
+      getDownloadableFile: vi.fn().mockResolvedValue(file),
+      openDownload: vi.fn().mockResolvedValue(
+        (async function* () {
+          yield new Uint8Array([1, 2, 3]);
+        })(),
+      ),
+    };
+    const telegram = {
+      uploadMedia: vi.fn().mockResolvedValue({
+        fileId: 'telegram-file',
+        fileUniqueId: 'telegram-unique',
+        messageId: 42,
+      }),
+      deleteMessage: vi.fn().mockRejectedValue(new Error('Message cannot be deleted')),
+    };
+    const preparer = new MediaPreparer(
+      { updateMedia } as unknown as DirectusMediaClient,
+      yandex as unknown as YandexDiskClient,
+      telegram as unknown as TelegramClient,
+      '-100123',
+      pino({ enabled: false }),
+    );
+
+    await preparer.prepare(asset);
+
+    expect(updateMedia).toHaveBeenCalledTimes(2);
+    expect(updateMedia).toHaveBeenLastCalledWith(
+      17,
+      expect.objectContaining({ status: 'ready', telegram_file_id: 'telegram-file' }),
     );
   });
 

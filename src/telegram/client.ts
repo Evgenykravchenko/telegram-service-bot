@@ -88,7 +88,7 @@ export class TelegramClient {
     chatId: string,
     file: DownloadableFile,
     stream: AsyncIterable<Uint8Array>,
-  ): Promise<{ fileId: string; fileUniqueId: string }> {
+  ): Promise<{ fileId: string; fileUniqueId: string; messageId: number }> {
     assertTelegramUploadSize(kind, file.size);
     const boundary = `telegram-service-${crypto.randomUUID()}`;
     const safeName = file.name.replace(/["\r\n]/g, '_');
@@ -117,6 +117,10 @@ export class TelegramClient {
     });
     const message = await parseTelegramResponse<UploadedMessage>(response, method);
     return extractUploadedFile(message, kind);
+  }
+
+  deleteMessage(chatId: string | number, messageId: number): Promise<unknown> {
+    return this.call('deleteMessage', { chat_id: chatId, message_id: messageId });
   }
 
   answerCallbackQuery(callbackQueryId: string): Promise<unknown> {
@@ -163,6 +167,7 @@ interface TelegramFileObject {
 }
 
 interface UploadedMessage {
+  message_id: number;
   photo?: TelegramFileObject[];
   video?: TelegramFileObject;
   audio?: TelegramFileObject;
@@ -194,10 +199,14 @@ async function* multipartBody(
 function extractUploadedFile(
   message: UploadedMessage,
   kind: MediaKind,
-): { fileId: string; fileUniqueId: string } {
+): { fileId: string; fileUniqueId: string; messageId: number } {
   const file = kind === 'photo' ? message.photo?.at(-1) : message[kind];
   if (!file) throw new Error(`Telegram response does not contain uploaded ${kind}`);
-  return { fileId: file.file_id, fileUniqueId: file.file_unique_id };
+  return {
+    fileId: file.file_id,
+    fileUniqueId: file.file_unique_id,
+    messageId: message.message_id,
+  };
 }
 
 export function assertTelegramUploadSize(kind: MediaKind, size: number): void {
