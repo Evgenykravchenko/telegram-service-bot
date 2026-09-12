@@ -48,8 +48,9 @@ export class TelegramPoller {
           } catch (error) {
             await this.updates.fail(update.update_id, error);
             this.logger.error({ err: error, updateId: update.update_id }, 'Update handling failed');
-            await delay(2000);
-            break;
+            // The handler may already have persisted a state transition or queued an
+            // application. Replaying the same update could apply that transition twice.
+            this.offset = update.update_id + 1;
           }
         }
       } catch (error) {
