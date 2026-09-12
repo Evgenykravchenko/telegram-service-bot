@@ -12,3 +12,7 @@ All notable changes to this project will be documented in this file.
 - Directus-backed editable content with local fallbacks.
 - Streamed Yandex Disk to Telegram media preparation with reusable `file_id` storage.
 - Local Docker Compose environment and automated quality checks.
+
+### Changed
+
+- Media staging messages are deleted after their Telegram identifiers are saved in Directus.
