@@ -35,4 +35,18 @@ describe('loadConfig', () => {
       }),
     ).toThrow(/placeholder privacy URL/);
   });
+
+  it('requires CMS and a media chat when Yandex Disk is enabled', () => {
+    expect(() => loadConfig({ ...validEnvironment, YANDEX_DISK_TOKEN: 'token' })).toThrow(
+      /DIRECTUS_ENABLED/,
+    );
+    expect(() =>
+      loadConfig({
+        ...validEnvironment,
+        YANDEX_DISK_TOKEN: 'token',
+        DIRECTUS_ENABLED: 'true',
+        DIRECTUS_TOKEN: 'directus-token',
+      }),
+    ).toThrow(/TELEGRAM_MEDIA_CHAT_ID/);
+  });
 });
