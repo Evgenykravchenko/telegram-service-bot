@@ -1,4 +1,4 @@
-FROM node:22.18.0-alpine AS dependencies
+FROM node:26.8-alpine AS dependencies
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -14,7 +14,7 @@ COPY src ./src
 COPY tests ./tests
 CMD ["npm", "test"]
 
-FROM node:22.18.0-alpine AS runtime
+FROM node:26.8-alpine AS runtime
 ARG VERSION=dev
 ARG VCS_REF=unknown
 ENV NODE_ENV=production
