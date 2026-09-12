@@ -1,0 +1,41 @@
+name: telegram-service-bot
+
+services:
+  bot:
+    image: ${BOT_IMAGE:-ghcr.io/evgenykravchenko/telegram-service-bot}:${BOT_VERSION:?BOT_VERSION must be a SemVer release such as 0.1.0}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}
+      TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID:?TELEGRAM_ADMIN_CHAT_ID is required}
+      TELEGRAM_CHANNEL_USERNAME: ${TELEGRAM_CHANNEL_USERNAME:?TELEGRAM_CHANNEL_USERNAME is required}
+      TELEGRAM_CHANNEL_URL: ${TELEGRAM_CHANNEL_URL:?TELEGRAM_CHANNEL_URL is required}
+      CONTENT_BOT_KEY: ${CONTENT_BOT_KEY:-telegram-service-bot}
+      DIRECTUS_ENABLED: ${DIRECTUS_ENABLED:-true}
+      DIRECTUS_URL: ${DIRECTUS_URL:-http://directus:8055}
+      DIRECTUS_TOKEN: ${DIRECTUS_TOKEN:?DIRECTUS_TOKEN is required}
+      CONTENT_CACHE_TTL_SECONDS: ${CONTENT_CACHE_TTL_SECONDS:-60}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      DATABASE_SSL: ${DATABASE_SSL:-false}
+      PRIVACY_POLICY_URL: ${PRIVACY_POLICY_URL:?PRIVACY_POLICY_URL is required}
+      PRIVACY_CONTACT_EMAIL: ${PRIVACY_CONTACT_EMAIL:?PRIVACY_CONTACT_EMAIL is required}
+      PRIVACY_CONTACT_TELEGRAM: ${PRIVACY_CONTACT_TELEGRAM:?PRIVACY_CONTACT_TELEGRAM is required}
+      HEALTH_PORT: ${HEALTH_PORT:-8090}
+      TELEGRAM_POLL_TIMEOUT_SECONDS: ${TELEGRAM_POLL_TIMEOUT_SECONDS:-30}
+      TELEGRAM_REQUEST_TIMEOUT_SECONDS: ${TELEGRAM_REQUEST_TIMEOUT_SECONDS:-35}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-24}
+      APPLICATION_RETENTION_DAYS: ${APPLICATION_RETENTION_DAYS:-30}
+    networks: [egress, platform]
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+networks:
+  egress:
+    driver: bridge
+  platform:
+    name: bot_platform_backend
+    external: true

@@ -1,0 +1,35 @@
+name: Deploy production
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Released image version, for example 0.2.0
+        required: true
+
+concurrency:
+  group: telegram-service-bot-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, Linux, ARM64, telegram-service-prod]
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+      - name: Copy deployment files outside the runner workspace
+        run: |
+          rsync -a --delete --exclude .git --exclude '.env*' ./ /opt/telegram-service-bot/
+      - name: Select released image
+        env:
+          DEPLOY_VERSION: ${{ inputs.version }}
+        run: |
+          printf '%s' "$DEPLOY_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$'
+          sed -i -E "s/^BOT_VERSION=.*/BOT_VERSION=$DEPLOY_VERSION/" \
+            /etc/bot-platform/bots/telegram-service-bot.env
+      - name: Deploy
+        run: /opt/telegram-service-bot/scripts/deploy.sh
