@@ -4,6 +4,10 @@ import { HealthServer } from './health/server.js';
 import { PostgresStore } from './repositories/postgres.js';
 import { ApplicationWorker } from './services/application-worker.js';
 import { ContentService } from './services/content-service.js';
+import { DirectusMediaClient } from './services/directus-media-client.js';
+import { MediaPreparer } from './services/media-preparer.js';
+import { MediaWorker } from './services/media-worker.js';
+import { YandexDiskClient } from './services/yandex-disk-client.js';
 import { TelegramClient } from './telegram/client.js';
 import { TelegramController } from './telegram/controller.js';
 import { TelegramPoller } from './telegram/poller.js';
@@ -13,6 +17,7 @@ export class Application {
   private readonly telegram: TelegramClient;
   private readonly poller: TelegramPoller;
   private readonly applicationWorker: ApplicationWorker;
+  private readonly mediaWorker: MediaWorker | null;
   private readonly health: HealthServer;
   private cleanupTimer: NodeJS.Timeout | null = null;
   private stopping = false;
@@ -25,6 +30,7 @@ export class Application {
     this.telegram = new TelegramClient(
       config.TELEGRAM_BOT_TOKEN,
       config.TELEGRAM_REQUEST_TIMEOUT_SECONDS * 1000,
+      config.TELEGRAM_UPLOAD_TIMEOUT_SECONDS * 1000,
       logger,
     );
     const content = new ContentService(
@@ -46,6 +52,33 @@ export class Application {
     );
     this.poller = new TelegramPoller(config, this.telegram, this.store, controller, logger);
     this.applicationWorker = new ApplicationWorker(config, this.store, this.telegram, logger);
+    if (config.YANDEX_DISK_TOKEN) {
+      const mediaClient = new DirectusMediaClient(
+        config.DIRECTUS_URL,
+        config.DIRECTUS_TOKEN,
+        config.CONTENT_BOT_KEY,
+      );
+      const preparer = new MediaPreparer(
+        mediaClient,
+        new YandexDiskClient(
+          config.YANDEX_DISK_TOKEN,
+          config.TELEGRAM_UPLOAD_TIMEOUT_SECONDS * 1000,
+        ),
+        this.telegram,
+        config.TELEGRAM_MEDIA_CHAT_ID,
+        logger,
+      );
+      this.mediaWorker = new MediaWorker(
+        mediaClient,
+        preparer,
+        config.MEDIA_POLL_INTERVAL_SECONDS * 1000,
+        config.MEDIA_BATCH_SIZE,
+        logger,
+      );
+    } else {
+      this.mediaWorker = null;
+      logger.warn('YANDEX_DISK_TOKEN is empty: Telegram media preparation is disabled');
+    }
     this.health = new HealthServer(config.HEALTH_PORT, () => this.store.ping(), logger);
   }
 
@@ -73,8 +106,10 @@ export class Application {
         `Bot must be an administrator of ${this.config.TELEGRAM_CHANNEL_USERNAME} to check subscriptions`,
       );
     }
+    if (this.mediaWorker) await this.telegram.getChat(this.config.TELEGRAM_MEDIA_CHAT_ID);
     await this.health.start();
     this.applicationWorker.start();
+    this.mediaWorker?.start();
     this.poller.start();
     await this.cleanup();
     this.cleanupTimer = setInterval(() => void this.cleanup(), 6 * 60 * 60 * 1000);
@@ -91,6 +126,7 @@ export class Application {
     this.logger.info({ signal }, 'Stopping application');
     if (this.cleanupTimer) clearInterval(this.cleanupTimer);
     await this.poller.stop();
+    this.mediaWorker?.stop();
     await this.applicationWorker.stop();
     await this.health.stop();
     await this.store.close();

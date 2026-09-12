@@ -23,6 +23,14 @@ const schema = z
     DIRECTUS_URL: z.string().url().default('http://localhost:8055'),
     DIRECTUS_TOKEN: z.string().default(''),
     CONTENT_CACHE_TTL_SECONDS: z.coerce.number().int().min(5).max(3600).default(60),
+    YANDEX_DISK_TOKEN: z.string().default(''),
+    TELEGRAM_MEDIA_CHAT_ID: z
+      .string()
+      .refine((value) => value === '' || /^-?\d+$/.test(value), 'must be an integer chat ID')
+      .default(''),
+    MEDIA_POLL_INTERVAL_SECONDS: z.coerce.number().int().min(5).max(3600).default(20),
+    MEDIA_BATCH_SIZE: z.coerce.number().int().min(1).max(10).default(3),
+    TELEGRAM_UPLOAD_TIMEOUT_SECONDS: z.coerce.number().int().min(60).max(3600).default(600),
     DATABASE_URL: z.string().url(),
     DATABASE_SSL: booleanFromString,
     PRIVACY_POLICY_URL: z.string().url(),
@@ -40,6 +48,22 @@ const schema = z
         code: z.ZodIssueCode.custom,
         path: ['DIRECTUS_TOKEN'],
         message: 'DIRECTUS_TOKEN is required when DIRECTUS_ENABLED=true',
+      });
+    }
+
+    if (value.YANDEX_DISK_TOKEN && !value.DIRECTUS_ENABLED) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['DIRECTUS_ENABLED'],
+        message: 'DIRECTUS_ENABLED must be true when YANDEX_DISK_TOKEN is configured',
+      });
+    }
+
+    if (value.YANDEX_DISK_TOKEN && !value.TELEGRAM_MEDIA_CHAT_ID) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['TELEGRAM_MEDIA_CHAT_ID'],
+        message: 'TELEGRAM_MEDIA_CHAT_ID is required when the media worker is enabled',
       });
     }
 

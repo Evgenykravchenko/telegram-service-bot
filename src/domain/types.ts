@@ -75,6 +75,7 @@ export interface TelegramUpdate {
 export interface ContentBlock {
   kind: 'text' | 'photo' | 'video' | 'audio' | 'document';
   body: string | null;
+  mediaReference: string | null;
   sendSeparately: boolean;
 }
 
@@ -88,4 +89,20 @@ export interface ContentButton {
 export interface ManagedContent {
   blocks: ContentBlock[];
   buttons: ContentButton[];
+}
+
+export type MediaKind = 'photo' | 'video' | 'audio' | 'document';
+export type MediaStatus = 'draft' | 'queued' | 'processing' | 'ready' | 'error';
+
+export interface MediaAsset {
+  id: number;
+  name: string;
+  kind: MediaKind;
+  yandex_path: string;
+  status: MediaStatus;
+  telegram_file_id: string | null;
+  telegram_file_unique_id: string | null;
+  mime_type: string | null;
+  file_size: number | null;
+  error_message: string | null;
 }

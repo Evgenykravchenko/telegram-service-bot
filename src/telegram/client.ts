@@ -1,5 +1,12 @@
+import { Readable } from 'node:stream';
 import type { Logger } from '../config/logger.js';
-import type { InlineKeyboardMarkup, TelegramUpdate, TelegramUser } from '../domain/types.js';
+import type {
+  InlineKeyboardMarkup,
+  MediaKind,
+  TelegramUpdate,
+  TelegramUser,
+} from '../domain/types.js';
+import type { DownloadableFile } from '../services/yandex-disk-client.js';
 
 interface TelegramEnvelope<T> {
   ok: boolean;
@@ -31,6 +38,7 @@ export class TelegramClient {
   constructor(
     token: string,
     private readonly requestTimeoutMs: number,
+    private readonly uploadTimeoutMs: number,
     private readonly logger: Logger,
   ) {
     this.baseUrl = `https://api.telegram.org/bot${token}/`;
@@ -66,13 +74,49 @@ export class TelegramClient {
   }
 
   sendMedia(
-    kind: 'photo' | 'video' | 'audio' | 'document',
+    kind: MediaKind,
     chatId: number,
     reference: string,
     options: SendOptions = {},
   ): Promise<unknown> {
     const method = `send${kind[0]?.toUpperCase() ?? ''}${kind.slice(1)}`;
     return this.call(method, { chat_id: chatId, [kind]: reference, ...options });
+  }
+
+  async uploadMedia(
+    kind: MediaKind,
+    chatId: string,
+    file: DownloadableFile,
+    stream: AsyncIterable<Uint8Array>,
+  ): Promise<{ fileId: string; fileUniqueId: string }> {
+    assertTelegramUploadSize(kind, file.size);
+    const boundary = `telegram-service-${crypto.randomUUID()}`;
+    const safeName = file.name.replace(/["\r\n]/g, '_');
+    const prefix = Buffer.from(
+      [
+        `--${boundary}\r\n`,
+        'Content-Disposition: form-data; name="chat_id"\r\n\r\n',
+        `${chatId}\r\n`,
+        `--${boundary}\r\n`,
+        `Content-Disposition: form-data; name="${kind}"; filename="${safeName}"\r\n`,
+        `Content-Type: ${file.mimeType}\r\n\r\n`,
+      ].join(''),
+    );
+    const suffix = Buffer.from(`\r\n--${boundary}--\r\n`);
+    const body = Readable.from(multipartBody(prefix, stream, suffix));
+    const method = `send${capitalize(kind)}`;
+    const response = await fetch(new URL(method, this.baseUrl), {
+      method: 'POST',
+      headers: {
+        'content-type': `multipart/form-data; boundary=${boundary}`,
+        'content-length': String(prefix.length + file.size + suffix.length),
+      },
+      body,
+      duplex: 'half',
+      signal: AbortSignal.timeout(this.uploadTimeoutMs),
+    });
+    const message = await parseTelegramResponse<UploadedMessage>(response, method);
+    return extractUploadedFile(message, kind);
   }
 
   answerCallbackQuery(callbackQueryId: string): Promise<unknown> {
@@ -109,16 +153,68 @@ export class TelegramClient {
       body: JSON.stringify(payload),
       signal: requestSignal,
     });
-    const data = (await response.json().catch(() => null)) as TelegramEnvelope<T> | null;
-    if (!response.ok || !data?.ok) {
-      throw new TelegramApiError(
-        data?.description ?? `${method}: HTTP ${response.status}`,
-        data?.error_code ?? response.status,
-        data?.parameters?.retry_after,
-      );
-    }
-    return data.result;
+    return parseTelegramResponse<T>(response, method);
   }
+}
+
+interface TelegramFileObject {
+  file_id: string;
+  file_unique_id: string;
+}
+
+interface UploadedMessage {
+  photo?: TelegramFileObject[];
+  video?: TelegramFileObject;
+  audio?: TelegramFileObject;
+  document?: TelegramFileObject;
+}
+
+async function parseTelegramResponse<T>(response: Response, method: string): Promise<T> {
+  const data = (await response.json().catch(() => null)) as TelegramEnvelope<T> | null;
+  if (!response.ok || !data?.ok) {
+    throw new TelegramApiError(
+      data?.description ?? `${method}: HTTP ${response.status}`,
+      data?.error_code ?? response.status,
+      data?.parameters?.retry_after,
+    );
+  }
+  return data.result;
+}
+
+async function* multipartBody(
+  prefix: Buffer,
+  stream: AsyncIterable<Uint8Array>,
+  suffix: Buffer,
+): AsyncGenerator<Buffer> {
+  yield prefix;
+  for await (const chunk of stream) yield Buffer.from(chunk);
+  yield suffix;
+}
+
+function extractUploadedFile(
+  message: UploadedMessage,
+  kind: MediaKind,
+): { fileId: string; fileUniqueId: string } {
+  const file = kind === 'photo' ? message.photo?.at(-1) : message[kind];
+  if (!file) throw new Error(`Telegram response does not contain uploaded ${kind}`);
+  return { fileId: file.file_id, fileUniqueId: file.file_unique_id };
+}
+
+export function assertTelegramUploadSize(kind: MediaKind, size: number): void {
+  const limit = (kind === 'photo' ? 10 : 50) * 1024 * 1024;
+  if (size > limit) {
+    throw new Error(
+      `${kind} is ${formatMegabytes(size)} MB; Telegram Bot API upload limit is ${formatMegabytes(limit)} MB`,
+    );
+  }
+}
+
+function formatMegabytes(bytes: number): string {
+  return (bytes / 1024 / 1024).toFixed(1);
+}
+
+function capitalize(value: string): string {
+  return `${value[0]?.toUpperCase() ?? ''}${value.slice(1)}`;
 }
 
 function isRetryable(error: unknown): boolean {

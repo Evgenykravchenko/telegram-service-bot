@@ -13,6 +13,10 @@ interface DirectusBlock {
   kind: ContentBlock['kind'];
   body: string | null;
   send_separately: boolean;
+  media: {
+    status: string;
+    telegram_file_id: string | null;
+  } | null;
 }
 
 interface DirectusButton {
@@ -83,7 +87,9 @@ export class ContentService {
     const blockQuery = new URLSearchParams({
       'filter[response][_eq]': String(item.id),
       'filter[enabled][_eq]': 'true',
-      fields: 'kind,body,send_separately',
+      'filter[_or][0][media][_null]': 'true',
+      'filter[_or][1][media][bot][key][_eq]': this.botKey,
+      fields: 'kind,body,send_separately,media.status,media.telegram_file_id',
       sort: 'sort,id',
       limit: '-1',
     });
@@ -107,6 +113,7 @@ export class ContentService {
       blocks: blocks.data.map((block) => ({
         kind: block.kind,
         body: block.body,
+        mediaReference: block.media?.status === 'ready' ? block.media.telegram_file_id : null,
         sendSeparately: block.send_separately,
       })),
       buttons: buttons.data.map((button) => ({

@@ -238,12 +238,20 @@ export class TelegramController {
       return;
     }
     const keyboard = contentKeyboard(content);
-    for (const [index, block] of content.blocks.entries()) {
-      if (!block.body) continue;
-      const options =
-        index === content.blocks.length - 1 && keyboard ? { reply_markup: keyboard } : {};
-      if (block.kind === 'text') await this.telegram.sendMessage(chatId, block.body, options);
-      else await this.telegram.sendMedia(block.kind, chatId, block.body, options);
+    const blocks = content.blocks.filter((block) =>
+      block.kind === 'text' ? Boolean(block.body) : Boolean(block.mediaReference ?? block.body),
+    );
+    for (const [index, block] of blocks.entries()) {
+      const reference = block.mediaReference ?? block.body;
+      const options = index === blocks.length - 1 && keyboard ? { reply_markup: keyboard } : {};
+      if (block.kind === 'text' && block.body) {
+        await this.telegram.sendMessage(chatId, block.body, options);
+      } else if (block.kind !== 'text' && reference) {
+        await this.telegram.sendMedia(block.kind, chatId, reference, options);
+      }
+    }
+    if (blocks.length === 0) {
+      await this.telegram.sendMessage(chatId, 'Материал ещё не подготовлен. Попробуйте позднее.');
     }
   }
 
