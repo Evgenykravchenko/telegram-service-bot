@@ -29,9 +29,12 @@ services:
       HEALTH_PORT: ${HEALTH_PORT:-8090}
       TELEGRAM_POLL_TIMEOUT_SECONDS: ${TELEGRAM_POLL_TIMEOUT_SECONDS:-30}
       TELEGRAM_REQUEST_TIMEOUT_SECONDS: ${TELEGRAM_REQUEST_TIMEOUT_SECONDS:-35}
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,directus,database}
       SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-24}
       APPLICATION_RETENTION_DAYS: ${APPLICATION_RETENTION_DAYS:-30}
-    networks: [egress, platform]
+    networks: [proxy, platform]
     logging:
       driver: json-file
       options:
@@ -39,8 +42,9 @@ services:
         max-file: '3'
 
 networks:
-  egress:
-    driver: bridge
+  proxy:
+    name: botcrm_xray_proxy
+    external: true
   platform:
     name: bot_platform_backend
     external: true
