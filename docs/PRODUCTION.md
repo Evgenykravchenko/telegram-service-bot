@@ -1,8 +1,8 @@
 # Production deployment
 
-Проект подготовлен к серверной упаковке, но его ещё нельзя выкатывать на Raspberry Pi до завершения локального smoke-теста и выделения рабочей базы.
+Бот разворачивается на Raspberry Pi и использует общие Directus, PostgreSQL и сетевой прокси платформы. Сам бот и его рабочие таблицы изолированы от других проектов.
 
-## Будущий контракт
+## Production-контракт
 
 - общая Directus CMS запущена из `bot-platform-infra`;
 - существует Docker-сеть `bot_platform_backend`;
@@ -11,13 +11,13 @@
 - секреты находятся в `/etc/bot-platform/bots/telegram-service-bot.env` с правами `600`;
 - `BOT_VERSION` содержит точную SemVer-версию, не `latest`;
 - runner имеет отдельный label `telegram-service-prod`.
+- Telegram API доступен через `botcrm_xray_proxy` и `xray_vless:8080`;
+- deploy считается успешным только после перехода healthcheck в `healthy`.
 
-Production Compose не запускает собственный PostgreSQL и не открывает host-порты. Решение о размещении рабочих таблиц будет добавлено в `bot-platform-infra` отдельным изменением после локальной проверки.
+Production Compose не запускает собственный PostgreSQL и не открывает host-порты. В общем PostgreSQL созданы отдельные база и роль `telegram_service`.
 
-## Что пока нельзя делать
+## Ограничения
 
-- запускать workflow **Deploy production**;
-- копировать локальный `.env` на сервер;
 - подключать бот к базе BotCRM;
 - создавать ещё один Directus;
 - запускать старый и новый процесс с одним Telegram-токеном одновременно.

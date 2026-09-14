@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import { Application } from './app.js';
 import { loadConfig } from './config/env.js';
 import { createLogger } from './config/logger.js';
@@ -6,6 +7,16 @@ import { createLogger } from './config/logger.js';
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config.LOG_LEVEL);
+  const outboundProxyEnabled = Boolean(
+    process.env.HTTPS_PROXY ??
+    process.env.https_proxy ??
+    process.env.HTTP_PROXY ??
+    process.env.http_proxy,
+  );
+  if (outboundProxyEnabled) {
+    setGlobalDispatcher(new EnvHttpProxyAgent());
+    logger.info('Outbound HTTP proxy enabled');
+  }
   const application = new Application(config, logger);
 
   const shutdown = (signal: string) => {
